@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image"; // Make sure to import the Image component
 import { 
     Play, Pause, SkipBack, SkipForward, User, Music, 
     Volume2, Volume1, VolumeX
@@ -22,6 +23,7 @@ interface Activity {
     };
     timestamps?: { start?: number };
     application_id?: string;
+    type?: number;
 }
 
 interface DiscordData {
@@ -36,7 +38,7 @@ interface DiscordData {
 }
 
 // Add user ID that you want to track
-const DISCORD_USER_ID = "765897415492239390"; // Replace this with the target Discord user ID
+const DISCORD_USER_ID = "765897415492239390";
 
 const TABS = [
     { id: "profile", label: "Profile", icon: User },
@@ -48,7 +50,6 @@ export default function DiscordActivity() {
     const [data, setData] = useState<DiscordData | null>(null);
     const [mounted, setMounted] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
     // Spotify State
@@ -144,7 +145,6 @@ export default function DiscordActivity() {
                 const json = await res.json();
                 if (json.success && json.data) {
                     setData(json.data);
-                    setLastUpdated(new Date());
                     setIsConnected(true);
                 } else {
                     throw new Error('Invalid response from Lanyard API');
@@ -173,7 +173,6 @@ export default function DiscordActivity() {
                     if (message.t === 'INIT_STATE' || message.t === 'PRESENCE_UPDATE') {
                         if (message.d) {
                             setData(message.d);
-                            setLastUpdated(new Date());
                             setIsConnected(true);
                             setError(null);
                         }
@@ -221,7 +220,7 @@ export default function DiscordActivity() {
                 setIsMuted(true); // Keep muted state consistent
             });
         }
-    }, []); // Empty dependency to run only once
+    }, [playlist.length, volume]); // Added playlist.length and volume to dependency array
 
     // Parse Spotify data
     useEffect(() => {
@@ -309,7 +308,8 @@ export default function DiscordActivity() {
         );
     }
 
-    const activities = data.activities.filter((a: any) => a.type !== 4 && a.name !== 'Spotify');
+    // Fix: Changed 'any' to 'Activity' to resolve the ESLint error
+    const activities = data.activities.filter((a: Activity) => a.type !== 4 && a.name !== 'Spotify');
     
     const VolumeIcon = () => {
         if (isMuted || volume === 0) return <VolumeX className="w-5 h-5 text-purple-300 flex-shrink-0"/>;
@@ -343,7 +343,14 @@ export default function DiscordActivity() {
                         <motion.div className="relative inline-block mb-4" initial={{ scale: 0, rotate: 180 }} animate={{ scale: 1, rotate: 0 }} transition={{ duration: 1, delay: 0.3, type: "spring", stiffness: 200 }}>
                             <div className="absolute -inset-1 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full animate-pulse"></div>
                             <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-white/20">
-                                <img src={`https://cdn.discordapp.com/avatars/${data.discord_user.id}/${data.discord_user.avatar}.png?size=256`} alt="avatar" className="w-full h-full object-cover" />
+                                <Image 
+                                    src={`https://cdn.discordapp.com/avatars/${data.discord_user.id}/${data.discord_user.avatar}.png?size=256`} 
+                                    alt="avatar" 
+                                    width={96} 
+                                    height={96} 
+                                    className="w-full h-full object-cover" 
+                                    unoptimized
+                                />
                             </div>
                             <motion.div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-slate-950 ${data.discord_status === "online" ? "bg-green-400" : data.discord_status === "dnd" ? "bg-red-400" : data.discord_status === "idle" ? "bg-yellow-400" : "bg-gray-400"}`} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.8, type: "spring", stiffness: 300 }} />
                         </motion.div>
@@ -406,7 +413,14 @@ export default function DiscordActivity() {
                                         {spotifyTrack && (
                                             <motion.div layoutId="spotify-card" className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
                                                 <div className="flex items-center space-x-4">
-                                                    <img src={spotifyTrack.albumArt} alt="Album Art" className="w-16 h-16 rounded-xl shadow-md"/>
+                                                    <Image 
+                                                        src={spotifyTrack.albumArt} 
+                                                        alt="Album Art" 
+                                                        width={64} 
+                                                        height={64} 
+                                                        className="w-16 h-16 rounded-xl shadow-md"
+                                                        unoptimized
+                                                    />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-green-300 text-sm">🎧 Listening on Spotify</p>
                                                         <h3 className="text-white font-semibold truncate">{spotifyTrack.song}</h3>
@@ -418,11 +432,18 @@ export default function DiscordActivity() {
                                         )}
                                         <div className="space-y-3">
                                             {activities.length > 0 ? (
-                                                activities.map(activity => (
+                                                activities.map((activity) => (
                                                     <motion.div key={activity.id} className="group relative p-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] transition-colors">
                                                         <div className="flex items-center space-x-4">
                                                             {activity.assets?.large_image ? (
-                                                                <img src={`https://cdn.discordapp.com/app-assets/${activity.application_id}/${activity.assets.large_image}.png`} alt="activity" className="w-12 h-12 rounded-lg object-cover" />
+                                                                <Image 
+                                                                    src={`https://cdn.discordapp.com/app-assets/${activity.application_id}/${activity.assets.large_image}.png`} 
+                                                                    alt="activity" 
+                                                                    width={48} 
+                                                                    height={48} 
+                                                                    className="w-12 h-12 rounded-lg object-cover" 
+                                                                    unoptimized
+                                                                />
                                                             ) : (
                                                                 <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600/30 to-pink-600/30 flex items-center justify-center"><span className="text-lg">🎮</span></div>
                                                             )}
